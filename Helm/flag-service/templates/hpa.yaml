@@ -1,0 +1,25 @@
+{{- if (index .Values "flag-service").autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: flag-service-hpa
+  namespace: {{ (index .Values "flag-service").namespace }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: app-flag-service
+  minReplicas: {{ (index .Values "flag-service").autoscaling.minReplicas }}
+  maxReplicas: {{ (index .Values "flag-service").autoscaling.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ (index .Values "flag-service").autoscaling.cpuTarget }}
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ (index .Values "flag-service").autoscaling.memoryTarget }}
+{{- end }}
