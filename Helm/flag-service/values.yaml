@@ -31,9 +31,9 @@ flag-service:
       failureThreshold: 3
   envFrom:
     - secretRef:
-        name: flag-service-db-secret
+        name: flag-service-config
     - secretRef:
-        name: flag-service-db-secret-host
+        name: flag-service-db-credentials
 
   autoscaling:
     enabled: true
