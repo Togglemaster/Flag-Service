@@ -35,6 +35,9 @@ flag-service:
     - secretRef:
         name: flag-service-db-credentials
 
+  ingress:
+    path: /flag-service(/|$)(.*)
+
   autoscaling:
     enabled: true
     minReplicas: 2
