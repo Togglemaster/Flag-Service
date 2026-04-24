@@ -1,7 +1,7 @@
 flag-service:
   replicaCount: 2
   namespace: flag-service
-  image: 778900740186.dkr.ecr.us-east-1.amazonaws.com/flag-service:staging-a9f08b8
+  image: 778900740186.dkr.ecr.us-east-1.amazonaws.com/flag-service:staging-fca8deb
   imagePullPolicy: IfNotPresent
   port: 8080
   imagePullSecrets:
