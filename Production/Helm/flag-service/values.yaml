@@ -34,6 +34,7 @@
         name: flag-service-config
     - secretRef:
         name: flag-service-db-credentials
+  env_vars: flag_db
 
   ingress:
     path: /flag-service(/|$)(.*)

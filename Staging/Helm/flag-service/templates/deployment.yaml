@@ -23,6 +23,9 @@ spec:
         - name: app-flag-service
           image: {{ (index .Values "flag-service").image }}
           imagePullPolicy: {{ (index .Values "flag-service").imagePullPolicy }}
+          env:
+            - name: POSTGRES_DB
+              value: {{ (index .Values "flag-service").env_vars }}
           resources:
             requests:
               cpu: "100m"
