@@ -17,9 +17,11 @@ spec:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: {{ (index .Values "flag-service").autoscaling.cpuTarget }}
+        averageUtilization: {{ (index .Values "flag-service").autoscaling.targetCPUUtilizationPercentage }}
+  - type: Resource
+    resource:
       name: memory
       target:
         type: Utilization
-        averageUtilization: {{ (index .Values "flag-service").autoscaling.memoryTarget }}
+        averageUtilization: {{ (index .Values "flag-service").autoscaling.targetMemoryUtilizationPercentage }}
 {{- end }}
