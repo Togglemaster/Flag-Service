@@ -1,7 +1,7 @@
 flag-service:
   replicas: 1
   namespace: flag-service
-  image: 778900740186.dkr.ecr.us-east-1.amazonaws.com/flag-service:production-28950b1
+  image: 778900740186.dkr.ecr.us-east-1.amazonaws.com/flag-service:production-39984fc
   imagePullPolicy: IfNotPresent
   port: 8002
   imagePullSecrets:
