@@ -1,149 +1,367 @@
-# flag-service (Python)
+# Flag Service 🚩
 
-Este é o serviço de CRUD (Create, Read, Update, Delete) do projeto ToggleMaster. Ele é responsável por gerenciar as *definições* das feature flags.
+Serviço de gerenciamento (CRUD) de feature flags do **ToggleMaster**. Este serviço é responsável por criar, ler, atualizar e deletar as definições das feature flags.
 
-**IMPORTANTE:** Este serviço é protegido e depende que o `auth-service` esteja rodando. Todas as requisições (exceto `/health`) exigem um header `Authorization: Bearer <sua-chave-api>`.
+## 🎯 Descrição do Serviço
 
-## 📦 Pré-requisitos (Local)
+O Flag Service é o ponto central de controle para definições de feature flags. Ele:
 
-* [Python](https://www.python.org/) (versão 3.9 ou superior)
-* [PostgreSQL](https://www.postgresql.org/download/) (rodando localmente ou em um contêiner Docker)
-* O `auth-service` deve estar rodando (localmente na porta `8001`).
+1. Gerencia o lifecycle completo de feature flags (criar, listar, atualizar, desativar)
+2. Armazena definições em PostgreSQL
+3. Requer autenticação via chaves de API (valida com Auth Service)
+4. Expõe endpoints para operações CRUD protegidas
+5. Fornece endpoint `/health` para monitoramento
 
-## 🚀 Rodando Localmente
+**Função crítica:** Nenhuma feature flag existe sem estar registrada neste serviço. É a "fonte da verdade" para todas as flags.
 
-1.  **Clone o repositório** e entre na pasta `flag-service`.
+## 📦 Stack Técnico
 
-2.  **Prepare o Banco de Dados:**
-    * Crie um banco de dados no seu PostgreSQL (ex: `flags_db`).
-    * Execute o script `db/init.sql` para criar a tabela `flags`:
-        ```bash
-        psql -U seu_usuario -d flags_db -f db/init.sql
-        ```
+- **Linguagem:** Python 3.9+
+- **Framework:** Flask
+- **Banco de Dados:** PostgreSQL
+- **Autenticação:** Bearer Token (integração com Auth Service)
+- **Dependências principais:** psycopg2, flask, python-dotenv
 
-3.  **Configure as Variáveis de Ambiente:**
-    Crie um arquivo chamado `.env` na raiz desta pasta (`flag-service/`) com o seguinte conteúdo:
-    ```.env
-    # String de conexão do seu banco de dados PostgreSQL
-    DATABASE_URL="postgres://SEU_USUARIO:SUA_SENHA@localhost:5432/flags_db"
-    
-    # Porta que este serviço (flag-service) irá rodar
-    PORT="8002"
-    
-    # URL do auth-service (que deve estar rodando na porta 8001)
-    AUTH_SERVICE_URL="http://localhost:8001"
-    ```
+## 🚀 Como Usar
 
-4.  **Instale as Dependências:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+### Pré-requisitos Locais
 
-5.  **Inicie o Serviço:**
-    ```bash
-    gunicorn --bind 0.0.0.0:8002 app:app
-    ```
-    O servidor estará rodando em `http://localhost:8002`.
+- Python 3.9 ou superior
+- PostgreSQL 12+ (instalado ou via Docker)
+- Auth Service rodando (porta 8001)
 
-## 🔧 Variáveis de Ambiente
+### Setup Local
 
-O serviço requer as seguintes variáveis de ambiente para funcionar:
-
-### Obrigatórias
-- **`DATABASE_URL`** - String de conexão completa com o PostgreSQL
-  - Exemplo: `postgres://usuario:senha@localhost:5432/flags_db`
-  - Alternativamente, pode ser montada a partir das variáveis individuais abaixo
-- **`AUTH_SERVICE_URL`** - URL do Auth Service para validação de chaves
-  - Exemplo: `http://localhost:8001`
-
-### Variáveis Individuais (se DATABASE_URL não for definida)
-- **`POSTGRES_USER`** - Usuário do PostgreSQL
-- **`POSTGRES_PASSWORD`** - Senha do PostgreSQL  
-- **`POSTGRES_HOST`** - Host do PostgreSQL (ex: `localhost`)
-- **`POSTGRES_PORT`** - Porta do PostgreSQL (ex: `5432`)
-- **`POSTGRES_DB`** - Nome do banco de dados
-
-### Outras Variáveis
-- **`PORT`** - Porta onde o serviço irá rodar (padrão: `8002`)
-
-### Exemplo de arquivo .env
-```env
-# Opção 1: URL completa
-DATABASE_URL="postgres://togglemaster:senha123@localhost:5432/flags_db"
-
-# Opção 2: Variáveis individuais
-POSTGRES_USER="togglemaster"
-POSTGRES_PASSWORD="senha123"
-POSTGRES_HOST="localhost"
-POSTGRES_PORT="5432"
-POSTGRES_DB="flags_db"
-
-# Configurações do serviço
-PORT="8002"
-AUTH_SERVICE_URL="http://localhost:8001"
+#### 1. Clone e Navegue para o Diretório
+```bash
+cd Flag-Service
 ```
 
-### Notas Importantes
-- O **Auth Service** deve estar acessível na URL configurada
-- O banco de dados PostgreSQL deve ter a tabela `flags` criada (use `db/init.sql`)
-- Todas as requisições (exceto `/health`) exigem header `Authorization: Bearer <chave>`
+#### 2. Prepare o Banco de Dados
 
-## 🧪 Testando os Endpoints
+Crie um banco de dados PostgreSQL:
+```bash
+createdb flags_db
+```
 
-**Primeiro, você precisa de uma chave de API válida!**
+Execute o script de inicialização:
+```bash
+psql -U seu_usuario -d flags_db -f db/init.sql
+```
 
-1.  Vá até o terminal do `auth-service` (que deve estar rodando) e crie uma chave:
-    ```bash
-    curl -X POST http://localhost:8001/admin/keys \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer admin-secreto-123" \
-    -d '{"name": "admin-para-flag-service"}'
-    ```
-2.  Copie a chave retornada (ex: `tm_key_...`). Vamos chamá-la de `SUA_CHAVE_API` no resto dos exemplos.
+Este script cria a tabela `flags` com a seguinte estrutura:
+```sql
+CREATE TABLE flags (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL,
+    description TEXT,
+    is_enabled BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
 
----
+#### 3. Configure as Variáveis de Ambiente
+Crie um arquivo `.env` na raiz do serviço:
 
-**Agora, teste o `flag-service`:**
+```env
+# Banco de Dados PostgreSQL
+DATABASE_URL=postgres://usuario:senha@localhost:5432/flags_db
 
-**1. Verifique a Saúde (Health Check):**
+# Ou configure individualmente:
+POSTGRES_USER=togglemaster
+POSTGRES_PASSWORD=seu_password_seguro
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=flags_db
+
+# Serviço
+PORT=8002
+
+# Auth Service (para validação de chaves)
+AUTH_SERVICE_URL=http://localhost:8001
+
+# Ambiente
+ENVIRONMENT=development
+```
+
+#### 4. Instale as Dependências
+```bash
+pip install -r requirements.txt
+```
+
+#### 5. Inicie o Serviço
+```bash
+gunicorn --bind 0.0.0.0:8002 app:app
+```
+
+O servidor estará disponível em `http://localhost:8002`.
+
+### Testando Localmente
+
+#### 1. Crie uma Chave de API
+Primeiro, gere uma chave via Auth Service (se não tiver):
+
+```bash
+curl -X POST http://localhost:8001/admin/keys \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer admin-secreto-123" \
+  -d '{"name": "flag-service-client"}'
+
+# Salve a chave retornada como SUA_CHAVE_API
+```
+
+#### 2. Health Check
 ```bash
 curl http://localhost:8002/health
+# Resposta esperada: {"status":"ok"}
 ```
 
-Saída esperada: `{"status":"ok"}`
-
-**2. Tente Acessar um Endpoint Protegido (Sem Chave):**
+#### 3. Tentar Acessar Sem Chave (Deve Falhar)
 ```bash
 curl http://localhost:8002/flags
+# Resposta esperada: {"error":"Authorization header obrigatório"}
 ```
 
-Saída esperada: `{"error":"Authorization header obrigatório"}`
-
-**3. Crie uma nova Flag (Com a Chave Correta):**
+#### 4. Criar uma Nova Flag
 ```bash
 curl -X POST http://localhost:8002/flags \
--H "Content-Type: application/json" \
--H "Authorization: Bearer SUA_CHAVE_API" \
--d '{
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer SUA_CHAVE_API" \
+  -d '{
     "name": "enable-new-dashboard",
     "description": "Ativa o novo dashboard para usuários",
     "is_enabled": true
-}'
-```
-Saída esperada: (Um JSON com os dados da flag criada).
+  }'
 
-**4. Liste todas as Flags:**
+# Resposta esperada:
+# {
+#   "id": 1,
+#   "name": "enable-new-dashboard",
+#   "description": "Ativa o novo dashboard para usuários",
+#   "is_enabled": true,
+#   "created_at": "2025-05-17T10:30:00"
+# }
+```
+
+#### 5. Listar Todas as Flags
 ```bash
 curl http://localhost:8002/flags \
--H "Authorization: Bearer SUA_CHAVE_API"
-```
-Saída esperada: (Uma lista `[]` contendo a flag que você criou).
+  -H "Authorization: Bearer SUA_CHAVE_API"
 
-**5. Desative a Flag (PUT):**
+# Resposta esperada: lista JSON de todas as flags
+```
+
+#### 6. Atualizar uma Flag
 ```bash
 curl -X PUT http://localhost:8002/flags/enable-new-dashboard \
--H "Content-Type: application/json" \
--H "Authorization: Bearer SUA_CHAVE_API" \
--d '{"is_enabled": false}'
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer SUA_CHAVE_API" \
+  -d '{"is_enabled": false}'
+
+# Resposta esperada: flag atualizada com is_enabled=false
 ```
-Saída esperada: (O JSON da flag atualizada, com `"is_enabled": false`).
+
+#### 7. Obter Flag Específica
+```bash
+curl http://localhost:8002/flags/enable-new-dashboard \
+  -H "Authorization: Bearer SUA_CHAVE_API"
+
+# Resposta esperada: JSON da flag
+```
+
+#### 8. Deletar uma Flag
+```bash
+curl -X DELETE http://localhost:8002/flags/enable-new-dashboard \
+  -H "Authorization: Bearer SUA_CHAVE_API"
+
+# Resposta esperada: {"message":"Flag deletada com sucesso"}
+```
+
+## 🔧 Variáveis de Ambiente
+
+### Obrigatórias
+| Variável | Descrição | Exemplo |
+|----------|-----------|---------|
+| `POSTGRES_USER` | Usuário PostgreSQL | `togglemaster` |
+| `POSTGRES_PASSWORD` | Senha PostgreSQL | `senha_forte_123` |
+| `POSTGRES_HOST` | Host PostgreSQL | `localhost` |
+| `POSTGRES_PORT` | Porta PostgreSQL | `5432` |
+| `POSTGRES_DB` | Nome do banco de dados | `flags_db` |
+| `AUTH_SERVICE_URL` | URL do Auth Service | `http://localhost:8001` |
+
+**Nota:** Alternativamente, use `DATABASE_URL` ao invés das variáveis individuais.
+
+### Opcionais
+| Variável | Descrição | Padrão |
+|----------|-----------|--------|
+| `PORT` | Porta do servidor | `8002` |
+| `ENVIRONMENT` | Ambiente (development/production) | `development` |
+| `LOG_LEVEL` | Nível de log | `INFO` |
+| `MAX_CONNECTIONS` | Conexões máximas ao BD | `10` |
+
+## 🔐 GitHub Secrets Necessários
+
+Configure os seguintes secrets no GitHub para CI/CD:
+
+```yaml
+POSTGRES_USER
+  Descrição: Usuário PostgreSQL
+  Valor: togglemaster
+
+POSTGRES_PASSWORD
+  Descrição: Senha PostgreSQL
+  Valor: <sua-senha-forte>
+
+POSTGRES_HOST
+  Descrição: Host PostgreSQL
+  Valor: db.example.com
+
+POSTGRES_PORT
+  Descrição: Porta PostgreSQL
+  Valor: 5432
+
+POSTGRES_DB
+  Descrição: Nome do banco de dados
+  Valor: flags_db
+
+DATABASE_URL
+  Descrição: String de conexão completa
+  Valor: postgres://user:password@host:5432/flags_db
+
+AUTH_SERVICE_URL
+  Descrição: URL do Auth Service
+  Valor: http://auth-service:8001
+
+DOCKERHUB_USERNAME
+  Descrição: Docker Hub username
+  Valor: <seu-username>
+
+DOCKERHUB_TOKEN
+  Descrição: Docker Hub personal access token
+  Valor: <seu-token>
+
+REGISTRY_URL
+  Descrição: URL do registry de container
+  Valor: docker.io
+
+SONAR_TOKEN
+  Descrição: Token SonarQube
+  Valor: <seu-token>
+```
+
+## 📊 Endpoints da API
+
+### Públicos (sem autenticação)
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET | `/health` | Verifica saúde do serviço |
+
+### Protegidos (requer Bearer Token)
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET | `/flags` | Lista todas as flags |
+| POST | `/flags` | Cria uma nova flag |
+| GET | `/flags/{name}` | Obtém flag específica |
+| PUT | `/flags/{name}` | Atualiza uma flag |
+| DELETE | `/flags/{name}` | Deleta uma flag |
+
+### Corpo (POST/PUT)
+
+```json
+{
+  "name": "enable-feature",
+  "description": "Descrição da feature flag",
+  "is_enabled": true
+}
+```
+
+## 🏗️ Arquitetura
+
+```
+Request → Middleware Auth → Flask Route → Validator → Database → Response
+                ↓
+         Validação na Auth Service
+```
+
+## 📋 Exemplo de Fluxo Completo
+
+1. **Criar Flag:**
+```bash
+curl -X POST http://localhost:8002/flags \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer tm_key_..." \
+  -d '{"name":"new-feature","is_enabled":true}'
+```
+
+2. **Listar Flags:**
+```bash
+curl http://localhost:8002/flags \
+  -H "Authorization: Bearer tm_key_..."
+```
+
+3. **Desativar Flag:**
+```bash
+curl -X PUT http://localhost:8002/flags/new-feature \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer tm_key_..." \
+  -d '{"is_enabled":false}'
+```
+
+4. **Deletar Flag:**
+```bash
+curl -X DELETE http://localhost:8002/flags/new-feature \
+  -H "Authorization: Bearer tm_key_..."
+```
+
+## 🔐 Segurança
+
+- ✅ Todas as requisições (exceto `/health`) exigem Bearer Token válido
+- ✅ Tokens são validados via Auth Service
+- ✅ Senhas de banco de dados devem estar em variáveis de ambiente
+- ✅ Use HTTPS em produção
+- ✅ Implemente rate limiting em produção
+
+## 🐛 Troubleshooting
+
+### Problema: "psycopg2.OperationalError: could not connect"
+**Solução:** Verifique credenciais do PostgreSQL
+```bash
+psql -U seu_usuario -d flags_db -c "SELECT 1"
+```
+
+### Problema: "Authorization header obrigatório"
+**Solução:** Adicione o header Authorization com uma chave válida
+```bash
+curl -H "Authorization: Bearer sua_chave" ...
+```
+
+### Problema: "Invalid token"
+**Solução:** Verifique se a chave ainda é válida (pode ter sido revogada)
+
+### Problema: "Flag already exists"
+**Solução:** Nomes de flags devem ser únicos; tente outro nome
+
+## 📊 Monitoramento
+
+### Logs
+```bash
+docker logs flag-service
+# ou localmente
+tail -f logs/flag-service.log
+```
+
+### Métricas
+- Número total de flags ativas
+- Taxa de criação de flags
+- Tempo de resposta dos endpoints
+
+## 📚 Recursos Adicionais
+
+- [Flask Documentation](https://flask.palletsprojects.com/)
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
+- [ToggleMaster Architecture](../README.md)
+
+## 👥 Suporte
+
+Para dúvidas ou problemas, abra uma issue no repositório principal ou entre em contato com o time DevOps.
